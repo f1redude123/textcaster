@@ -79,13 +79,13 @@ void draw() {
 }
 
 void renderBuffer(int buf[], int xBound) {
-    #ifdef _WIN32
+    /*#ifdef _WIN32
         system("cls");
     #else
         system("clear");
-    #endif
+    #endif*/
 
-    for (int i = 0; i < sizeof(buf) / sizeof(buf[0]); i++) {
+    for (int i = 0; i < (int)sizeof(buf) / (int)sizeof(buf[0]); i++) {
         if (i % xBound == 0 && i != 0) {
             putchar('\n');
         }
@@ -105,5 +105,6 @@ int main() {
     }
 
     draw();
+    printf("%s", (char *)buffer[0]);
     renderBuffer(buffer, FOV*PREC);
 }
