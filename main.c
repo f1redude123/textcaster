@@ -1,57 +1,57 @@
-#include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
+#include <stdio.h>
 #include <math.h>
+#include <time.h>
+#include <string.h>
+#include <curses.h>
+
+struct vec2 {
+    float x;
+    float y;
+};
 
 #define SIZE 10
-#define RES 1
-
-#define FOV 10
-#define PREC 10
+#define GRID_RES 4
 #define HEIGHT 50
+
+int map[SIZE*GRID_RES*SIZE*GRID_RES] = {0};
 
 #pragma region UTILS
 
-#define PI 3.1415926535897932
+#define PI 3.141593
 
-double degToRad(double deg) {
-    return deg * PI / 180.0;
+struct vec2 rotVec(float rot) {
+    struct vec2 vec;
+    vec.x = cos(rot);
+    vec.y = sin(rot);
+    return vec;
 }
 
-#pragma endregion
+float degToRad(int deg) {
+    return deg * PI / 180;
+}
 
-#pragma region MOVEMENT
+int idx(int x, int y, int xBound) {
+    return x + y * xBound;
+}
 
-struct vec2 {
-    int x;
-    int y;
-};
+int min(int a, int b) {
+    return (a < b ? a : b);
+}
 
-struct vec2 pos;
-
-int rot = 0;
-
-struct vec2 rotVec(double rot) {
-    struct vec2 new;
-    new.x = round(sin(rot));
-    new.y = round(cos(rot));
-    return new;
+int max(int a, int b) {
+    return (a > b ? a : b);
 }
 
 #pragma endregion
 
 #pragma region GENERATION
 
-int map[(SIZE*RES)*(SIZE*RES)];
-
-int idx(int x, int y) {
-    return x + y * SIZE * RES;
-}
-
-void fillTile(int x, int y, int c) {
-    for (int j = 0; j < RES; j++) {
-        for (int k = 0; k < RES; k++) {
-            map[idx(x*RES+j, y*RES+k)] = c;
+void fillTile(int x, int y) {
+    float num = rand() / (double)RAND_MAX;
+    for (int i = 0; i < GRID_RES; i++) {
+        for (int n = 0; n < GRID_RES; n++) {
+            map[idx(x*GRID_RES + i, y*GRID_RES + n, SIZE*GRID_RES)] = (int)(/*num > 0.7 ||*/ x == 0 || x == SIZE-1 || y == 0 || y == SIZE-1);
         }
     }
 }
@@ -60,51 +60,71 @@ void fillTile(int x, int y, int c) {
 
 #pragma region DRAWING
 
-int buffer[FOV*PREC*HEIGHT];
-
-void draw() {
-    for (double i = -FOV/PREC*2; i < FOV/PREC*2; i++) {
-        struct vec2 rayPos = pos;
-        struct vec2 dir = rotVec(degToRad(i));
-
-        while (map[idx(dir.x, dir.y)] == 0) {
-            rayPos.x += dir.x;
-            rayPos.y += dir.y;
+void drawBuf(int buf[], int len, int xBound) {
+    for (int y = 0; y < len / xBound; y += 2) {
+        for (int x = 0; x < xBound; x++) {
+            char* px1 = (buf[idx(x, y, xBound)] == 1 ? "47" : "40");
+            char* px2 = (buf[idx(x, y+1, xBound)] == 1 ? "37" : "30");
+            printf("\033[%s;%sm%s\033[0m", px1, px2, "▄");
         }
-
-        int dist = sqrt(pow(rayPos.x - pos.x, 2) + pow(rayPos.y, pos.y));
-
-        buffer[idx((int)round(i + FOV/PREC*2), HEIGHT - dist)];
-    }
-}
-
-void renderBuffer(int buf[], int xBound) {
-    /*#ifdef _WIN32
-        system("cls");
-    #else
-        system("clear");
-    #endif*/
-
-    for (int i = 0; i < (int)sizeof(buf) / (int)sizeof(buf[0]); i++) {
-        if (i % xBound == 0 && i != 0) {
-            putchar('\n');
-        }
-        printf("%s", buf[i] ? "██" : "  ");
+        printf("%s", "\n");
     }
 }
 
 #pragma endregion
 
+struct vec2 pos;
+
+void raycast(int* proj) {
+    for (int rot = -45; rot < 45; rot++) {
+        struct vec2 rayPos = pos;
+        struct vec2 dir = rotVec(degToRad(rot));
+        while (map[idx((int)round(rayPos.x), (int)round(rayPos.y), SIZE*GRID_RES)] == 0) {
+            rayPos.x += dir.x;
+            rayPos.y += dir.y;
+        }
+        int dist = (int)sqrt(pow(rayPos.x-pos.x, 2) + pow(rayPos.y-pos.y, 2));
+        for (int i = min(HEIGHT, dist); i < max(0, HEIGHT-dist); i++) {
+            proj[idx(rot+45, i, 90)] = 1;
+        }
+    }
+}
+
 int main() {
     srand(time(NULL));
 
-    for (int x = 0; x < SIZE; x++) {
-        for (int y = 0; y < SIZE; y++) {
-            fillTile(x, y, (x == 0 || x == SIZE-1 || y == 0 || y == SIZE-1 || rand() % 4 == 0));
+    pos.x = 20;
+    pos.y = 16;
+
+    int key;
+
+    initscr();
+    raw();
+    keypad(stdscr, true);
+    noecho();
+
+    while (key != 's') {
+        key = getch();
+
+        #ifdef _WIN32
+            system("cls");
+        #else
+            system("clear");
+        #endif
+
+        for (int x = 0; x < SIZE; x++) {
+            for (int y = 0; y < SIZE; y++) {
+                fillTile(x, y);
+            }
         }
+
+        int buf[90*HEIGHT] = {0};
+        raycast(buf);
+
+        printf("%s", "\n");
+        drawBuf(buf, sizeof(buf) / sizeof(int), 90);
+        printf("%s", "\n");
     }
 
-    draw();
-    printf("%s", (char *)buffer[0]);
-    renderBuffer(buffer, FOV*PREC);
+    return 0;
 }
