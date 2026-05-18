@@ -1,9 +1,12 @@
+#define _XOPEN_SOURCE_EXTENDED 1
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
 #include <string.h>
-#include <curses.h>
+#include <ncursesw/ncurses.h>
+#include <locale.h>
+#include <wchar.h>
 
 struct vec2 {
     float x;
@@ -43,6 +46,8 @@ int max(int a, int b) {
     return (a > b ? a : b);
 }
 
+#define nitems(arr) (sizeof(arr) / sizeof(arr[0]))
+
 #pragma endregion
 
 #pragma region GENERATION
@@ -51,7 +56,7 @@ void fillTile(int x, int y) {
     float num = rand() / (double)RAND_MAX;
     for (int i = 0; i < GRID_RES; i++) {
         for (int n = 0; n < GRID_RES; n++) {
-            map[idx(x*GRID_RES + i, y*GRID_RES + n, SIZE*GRID_RES)] = (int)(/*num > 0.7 ||*/ x == 0 || x == SIZE-1 || y == 0 || y == SIZE-1);
+            map[idx(x*GRID_RES + i, y*GRID_RES + n, SIZE*GRID_RES)] = (int)(num > 0.7 || x == 0 || x == SIZE-1 || y == 0 || y == SIZE-1);
         }
     }
 }
@@ -61,24 +66,28 @@ void fillTile(int x, int y) {
 #pragma region DRAWING
 
 void drawBuf(int buf[], int len, int xBound) {
-    for (int y = 0; y < len / xBound; y += 2) {
-        for (int x = 0; x < xBound; x++) {
-            char* px1 = (buf[idx(x, y, xBound)] == 1 ? "47" : "40");
-            char* px2 = (buf[idx(x, y+1, xBound)] == 1 ? "37" : "30");
-            printf("\033[%s;%sm%s\033[0m", px1, px2, "▄");
+    for (int y = 0; y < len / xBound; y += 3) {
+        for (int x = 0; x < xBound; x += 2) {
+            cchar_t ch;
+            wchar_t br = (0x2800 + (buf[idx(x, y, xBound)] << 5) | (buf[idx(x, y+1, xBound)] << 4) | (buf[idx(x, y+2, xBound)] << 3) | (buf[idx(x+1, y, xBound)] << 2) | (buf[idx(x+1, y+1, xBound)] << 1) | buf[idx(x+1, y+2, xBound)]);
+            setcchar(&ch, &br, 0, 0, NULL);
         }
-        printf("%s", "\n");
+        printw("%s", "\n");
     }
 }
 
 #pragma endregion
 
-struct vec2 pos;
+#pragma region MAIN LOOP
 
-void raycast(int* proj) {
+struct vec2 pos;
+int yRot = 0;
+
+void raycast(int proj[], size_t size) {
+    memset(proj, 0, size);
     for (int rot = -45; rot < 45; rot++) {
         struct vec2 rayPos = pos;
-        struct vec2 dir = rotVec(degToRad(rot));
+        struct vec2 dir = rotVec(degToRad((rot+yRot)%360));
         while (map[idx((int)round(rayPos.x), (int)round(rayPos.y), SIZE*GRID_RES)] == 0) {
             rayPos.x += dir.x;
             rayPos.y += dir.y;
@@ -90,41 +99,84 @@ void raycast(int* proj) {
     }
 }
 
+void movePlayer(int rot) {
+    struct vec2 rVec = rotVec(yRot);
+    struct vec2 nPos = pos;
+    nPos.x += round(rVec.x);
+    nPos.y += round(rVec.y);
+    if (map[idx((int)nPos.x, (int)nPos.y, SIZE*GRID_RES)] == 0)
+        pos = nPos;
+}
+
+int buf[90*HEIGHT] = {0};
+int last[90*HEIGHT];
+
 int main() {
     srand(time(NULL));
 
     pos.x = 20;
     pos.y = 16;
 
-    int key;
+    char key;
+
+    setlocale(LC_ALL, "");
 
     initscr();
     raw();
-    keypad(stdscr, true);
     noecho();
+    nodelay(stdscr, TRUE);
 
-    while (key != 's') {
+    start_color();
+    use_default_colors();
+
+    init_pair(1, COLOR_BLACK, COLOR_BLACK);
+    init_pair(2, COLOR_BLACK, COLOR_WHITE);
+    init_pair(3, COLOR_WHITE, COLOR_BLACK);
+    init_pair(4, COLOR_WHITE, COLOR_WHITE);
+
+    for (int x = 0; x < SIZE; x++) {
+        for (int y = 0; y < SIZE; y++) {
+            fillTile(x, y);
+        }
+    }
+
+    while (key != '`') {
         key = getch();
 
-        #ifdef _WIN32
-            system("cls");
-        #else
-            system("clear");
-        #endif
-
-        for (int x = 0; x < SIZE; x++) {
-            for (int y = 0; y < SIZE; y++) {
-                fillTile(x, y);
-            }
+        if (key == 'w') {
+            movePlayer(yRot);
         }
+        if (key == 's')
+            movePlayer(yRot+180);
+        if (key == 'd')
+            movePlayer(yRot+90);
+        if (key == 'a')
+            movePlayer(yRot-90);
+        
+        if (key == 'e')
+            yRot = (yRot + 5) % 360;
+        if (key == 'q')
+            yRot = (yRot - 5) % -360;
 
-        int buf[90*HEIGHT] = {0};
-        raycast(buf);
+        raycast(buf, sizeof(buf));
 
-        printf("%s", "\n");
-        drawBuf(buf, sizeof(buf) / sizeof(int), 90);
-        printf("%s", "\n");
+        if (memcmp(buf, last, sizeof(buf)) != 0) {
+            clear();
+
+            printw("%f%s%f%s", pos.x, ", ", pos.y, "\n");
+            printw("%d%s", yRot, "\n");
+
+            drawBuf(buf, nitems(buf), 90);
+
+            memcpy(last, buf, sizeof(buf));
+
+            refresh();
+        }
     }
+
+    endwin();
 
     return 0;
 }
+
+#pragma endregion

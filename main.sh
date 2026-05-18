@@ -1,2 +1,2 @@
-gcc main.c -o main -lm
+gcc main.c -lncursesw -o main -lm
 ./main
