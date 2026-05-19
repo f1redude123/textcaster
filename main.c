@@ -17,6 +17,8 @@ struct vec2 {
 #define GRID_RES 4
 #define HEIGHT 50
 
+#define RENDER_METHOD 1
+
 int map[SIZE*GRID_RES*SIZE*GRID_RES] = {0};
 
 #pragma region UTILS
@@ -65,14 +67,48 @@ void fillTile(int x, int y) {
 
 #pragma region DRAWING
 
-void drawBuf(int buf[], int len, int xBound) {
-    for (int y = 0; y < len / xBound; y += 3) {
-        for (int x = 0; x < xBound; x += 2) {
-            cchar_t ch;
-            wchar_t br = (0x2800 + (buf[idx(x, y, xBound)] << 5) | (buf[idx(x, y+1, xBound)] << 4) | (buf[idx(x, y+2, xBound)] << 3) | (buf[idx(x+1, y, xBound)] << 2) | (buf[idx(x+1, y+1, xBound)] << 1) | buf[idx(x+1, y+2, xBound)]);
-            setcchar(&ch, &br, 0, 0, NULL);
+void drawnbuf(int buf[], int len, int xBound) {
+    for (int y = 0; y < len / xBound; y += 2) {
+        for (int x = 0; x < xBound; x++) {
+            int pair = COLOR_PAIR((int)(buf[idx(x, y, xBound)] == 1) + (int)(buf[idx(x, y+1, xBound)] == 1)*2 + 1);
+            attron(pair);
+            printw("%s", "▄");
+            attroff(pair);
         }
         printw("%s", "\n");
+    }
+}
+
+void drawbbuf(int buf[], int len, int xBound) {
+    cchar_t ch;
+    for (int y = 0; y < len / xBound; y += 4) {
+        for (int x = 0; x < xBound; x += 2) {
+            wchar_t br = (0x2800 + (buf[idx(x, y, xBound)] << 7) | (buf[idx(x, y+1, xBound)] << 6) | (buf[idx(x, y+2, xBound)] << 5) | (buf[idx(x+1, y, xBound)] << 4) | (buf[idx(x+1, y+1, xBound)] << 3) | (buf[idx(x+1, y+2, xBound)] << 2) | (buf[idx(x, y+3, xBound) << 1]) | buf[idx(x+1, y+3, xBound)]);
+            setcchar(&ch, &br, 0, 0, NULL);
+            add_wch(&ch);
+        }
+        printw("%s", "\n");
+    }
+}
+
+enum MENU_ELEM_TYPE {
+    TEXT,
+    BTN
+};
+
+void draw_menu_elem();
+
+#define drawBuf(buf, len, xBound) (RENDER_METHOD == 0 ? drawnbuf(buf, len, xBound) : drawbbuf(buf, len, xBound))
+
+#pragma endregion
+
+#pragma region DRAW METHODS
+
+void blitrect(int buf[], int minx, int miny, int maxx, int maxy, int xBound, int ch) {
+    for (int x = minx; x < maxx; x++) {
+        for (int y = miny; y < maxy; y++) {
+            buf[idx(x, y, xBound)] = ch;
+        }
     }
 }
 
@@ -83,8 +119,7 @@ void drawBuf(int buf[], int len, int xBound) {
 struct vec2 pos;
 int yRot = 0;
 
-void raycast(int proj[], size_t size) {
-    memset(proj, 0, size);
+void raycast(int proj[]) {
     for (int rot = -45; rot < 45; rot++) {
         struct vec2 rayPos = pos;
         struct vec2 dir = rotVec(degToRad((rot+yRot)%360));
@@ -111,6 +146,9 @@ void movePlayer(int rot) {
 int buf[90*HEIGHT] = {0};
 int last[90*HEIGHT];
 
+bool menuopen = FALSE;
+bool quit = FALSE;
+
 int main() {
     srand(time(NULL));
 
@@ -125,6 +163,7 @@ int main() {
     raw();
     noecho();
     nodelay(stdscr, TRUE);
+    keypad(stdscr, TRUE);
 
     start_color();
     use_default_colors();
@@ -140,7 +179,7 @@ int main() {
         }
     }
 
-    while (key != '`') {
+    while (!quit) {
         key = getch();
 
         if (key == 'w') {
@@ -157,18 +196,26 @@ int main() {
             yRot = (yRot + 5) % 360;
         if (key == 'q')
             yRot = (yRot - 5) % -360;
+        
+        if (key == '`') {
+            menuopen = !menuopen;
+        }
+        
+        size_t bsize = sizeof(buf);
 
-        raycast(buf, sizeof(buf));
+        memset(buf, 0, bsize);
+        raycast(buf);
 
-        if (memcmp(buf, last, sizeof(buf)) != 0) {
+        if (menuopen) {
+            blitrect(buf, 10, 10, HEIGHT-10, 80, 90, 0);
+        }
+
+        if (memcmp(buf, last, bsize) != 0) {
             clear();
-
-            printw("%f%s%f%s", pos.x, ", ", pos.y, "\n");
-            printw("%d%s", yRot, "\n");
 
             drawBuf(buf, nitems(buf), 90);
 
-            memcpy(last, buf, sizeof(buf));
+            memcpy(last, buf, bsize);
 
             refresh();
         }
