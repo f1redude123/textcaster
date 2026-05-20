@@ -15,6 +15,8 @@ struct vec2 {
 
 #define SIZE 10
 #define GRID_RES 4
+
+#define WIDTH 90
 #define HEIGHT 50
 
 #define RENDER_METHOD 1
@@ -37,7 +39,7 @@ float degToRad(int deg) {
 }
 
 int idx(int x, int y, int xBound) {
-    return x + y * xBound;
+    return (x % xBound) + y * xBound;
 }
 
 int min(int a, int b) {
@@ -91,13 +93,6 @@ void drawbbuf(int buf[], int len, int xBound) {
     }
 }
 
-enum MENU_ELEM_TYPE {
-    TEXT,
-    BTN
-};
-
-void draw_menu_elem();
-
 #define drawBuf(buf, len, xBound) (RENDER_METHOD == 0 ? drawnbuf(buf, len, xBound) : drawbbuf(buf, len, xBound))
 
 #pragma endregion
@@ -112,6 +107,10 @@ void blitrect(int buf[], int minx, int miny, int maxx, int maxy, int xBound, int
     }
 }
 
+void blitstr(int buf[], int x, int y, char str[]) {
+    
+}
+
 #pragma endregion
 
 #pragma region MAIN LOOP
@@ -120,7 +119,7 @@ struct vec2 pos;
 int yRot = 0;
 
 void raycast(int proj[]) {
-    for (int rot = -45; rot < 45; rot++) {
+    for (int rot = -WIDTH / 2; rot < WIDTH / 2; rot++) {
         struct vec2 rayPos = pos;
         struct vec2 dir = rotVec(degToRad((rot+yRot)%360));
         while (map[idx((int)round(rayPos.x), (int)round(rayPos.y), SIZE*GRID_RES)] == 0) {
@@ -129,7 +128,7 @@ void raycast(int proj[]) {
         }
         int dist = (int)sqrt(pow(rayPos.x-pos.x, 2) + pow(rayPos.y-pos.y, 2));
         for (int i = min(HEIGHT, dist); i < max(0, HEIGHT-dist); i++) {
-            proj[idx(rot+45, i, 90)] = 1;
+            proj[idx(rot+45, i, WIDTH)] = 1;
         }
     }
 }
@@ -143,8 +142,8 @@ void movePlayer(int rot) {
         pos = nPos;
 }
 
-int buf[90*HEIGHT] = {0};
-int last[90*HEIGHT];
+int buffer[WIDTH*HEIGHT] = {0};
+int last[WIDTH*HEIGHT];
 
 bool menuopen = FALSE;
 bool quit = FALSE;
@@ -201,21 +200,23 @@ int main() {
             menuopen = !menuopen;
         }
         
-        size_t bsize = sizeof(buf);
+        size_t bsize = sizeof(buffer);
 
-        memset(buf, 0, bsize);
-        raycast(buf);
+        memset(buffer, 0, bsize);
+        raycast(buffer);
 
         if (menuopen) {
-            blitrect(buf, 10, 10, HEIGHT-10, 80, 90, 0);
+            blitrect(buffer, 8, 8, WIDTH-8, HEIGHT-8, WIDTH, 0);
+            blitrect(buffer, 9, 9, WIDTH-9, HEIGHT-9, WIDTH, 1);
+            blitrect(buffer, 10, 10, WIDTH-10, HEIGHT-10, WIDTH, 0);
         }
 
-        if (memcmp(buf, last, bsize) != 0) {
+        if (memcmp(buffer, last, bsize) != 0) {
             clear();
 
-            drawBuf(buf, nitems(buf), 90);
+            drawBuf(buffer, nitems(buffer), WIDTH);
 
-            memcpy(last, buf, bsize);
+            memcpy(last, buffer, bsize);
 
             refresh();
         }
