@@ -19,7 +19,7 @@ struct vec2 {
 #define WIDTH 90
 #define HEIGHT 50
 
-#define RENDER_METHOD 1
+#define RENDER_METHOD 0
 
 int map[SIZE*GRID_RES*SIZE*GRID_RES] = {0};
 
