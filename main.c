@@ -19,7 +19,23 @@ struct vec2 {
 #define WIDTH 90
 #define HEIGHT 50
 
-#define RENDER_METHOD 0
+int options[] = {
+    0,
+    0,
+    0
+};
+
+int opmax[] = {
+    2,
+    1,
+    1
+};
+
+char mnames[][8] = {
+    "renderer",
+    "font",
+    "quit"
+};
 
 int map[SIZE*GRID_RES*SIZE*GRID_RES] = {0};
 
@@ -34,7 +50,7 @@ struct vec2 rotVec(float rot) {
     return vec;
 }
 
-float degToRad(int deg) {
+float degToRad(float deg) {
     return deg * PI / 180;
 }
 
@@ -69,7 +85,7 @@ void fillTile(int x, int y) {
 
 #pragma region DRAWING
 
-void drawnbuf(int buf[], int len, int xBound) {
+void drawnbuf(int buf[], size_t len, int xBound) {
     for (int y = 0; y < len / xBound; y += 2) {
         for (int x = 0; x < xBound; x++) {
             int pair = COLOR_PAIR((int)(buf[idx(x, y, xBound)] == 1) + (int)(buf[idx(x, y+1, xBound)] == 1)*2 + 1);
@@ -81,11 +97,11 @@ void drawnbuf(int buf[], int len, int xBound) {
     }
 }
 
-void drawbbuf(int buf[], int len, int xBound) {
+void drawbbuf(int buf[], size_t len, int xBound) {
     cchar_t ch;
     for (int y = 0; y < len / xBound; y += 4) {
         for (int x = 0; x < xBound; x += 2) {
-            wchar_t br = (0x2800 + (buf[idx(x, y, xBound)] << 7) | (buf[idx(x, y+1, xBound)] << 6) | (buf[idx(x, y+2, xBound)] << 5) | (buf[idx(x+1, y, xBound)] << 4) | (buf[idx(x+1, y+1, xBound)] << 3) | (buf[idx(x+1, y+2, xBound)] << 2) | (buf[idx(x, y+3, xBound) << 1]) | buf[idx(x+1, y+3, xBound)]);
+            wchar_t br = (0x2800 + (buf[idx(x, y, xBound)] | (buf[idx(x, y+1, xBound)] << 1) | (buf[idx(x, y+2, xBound)] << 2) | (buf[idx(x+1, y, xBound)] << 3) | (buf[idx(x+1, y+1, xBound)] << 4) | (buf[idx(x+1, y+2, xBound)] << 5) | (buf[idx(x, y+3, xBound)] << 6) | (buf[idx(x+1, y+3, xBound)] << 7)));
             setcchar(&ch, &br, 0, 0, NULL);
             add_wch(&ch);
         }
@@ -93,7 +109,16 @@ void drawbbuf(int buf[], int len, int xBound) {
     }
 }
 
-#define drawBuf(buf, len, xBound) (RENDER_METHOD == 0 ? drawnbuf(buf, len, xBound) : drawbbuf(buf, len, xBound))
+void drawwbuf(int buf[], size_t len, int xBound) {
+    for (int y = 0; y < len / xBound; y++) {
+        for (int x = 0; x < xBound; x++) {
+            printw("%s", (buf[idx(x, y, xBound)] == 1 ? "██" : "  "));
+        }
+        printw("%s", "\n");
+    }
+}
+
+#define drawBuf(buf, len, xBound) (options[0] == 0 ? drawnbuf(buf, len, xBound) : (options[0] == 1 ? drawbbuf(buf, len, xBound) : drawwbuf(buf, len, xBound)))
 
 #pragma endregion
 
@@ -107,8 +132,34 @@ void blitrect(int buf[], int minx, int miny, int maxx, int maxy, int xBound, int
     }
 }
 
-void blitstr(int buf[], int x, int y, char str[]) {
-    
+int FONT[36*36];
+int curfont = -1;
+
+void loadfont() {
+    char ch = (options[1]+'0');
+    //char *fp = strcat(".txt", &ch);
+    FILE *font = fopen("0.txt", "r");
+
+    char stream[1296];
+    fread(stream, sizeof(char), 1296, font);
+
+    int chi = 0;
+    for (int i = 0; i < 1296; i++) {
+        if (stream[i] == '0' || stream[i] == '1') {
+            FONT[chi] = stream[i] - '0';
+            chi++;
+        }
+    }
+}
+
+void blitstr(int buf[], int x, int y, int xBound, char str[], size_t len) {
+    for (int i = 0; i < len; i++) {
+        for (int l = 0; l < 6; l++) {
+            for (int r = 0; r < 6; r++) {
+                buf[idx(x+i*6+r, y+l, xBound)] = FONT[((int)(str[i])-87)*36 + l*6 + r];
+            }
+        }
+    }
 }
 
 #pragma endregion
@@ -128,13 +179,13 @@ void raycast(int proj[]) {
         }
         int dist = (int)sqrt(pow(rayPos.x-pos.x, 2) + pow(rayPos.y-pos.y, 2));
         for (int i = min(HEIGHT, dist); i < max(0, HEIGHT-dist); i++) {
-            proj[idx(rot+45, i, WIDTH)] = 1;
+            proj[idx(rot+WIDTH/2, i, WIDTH)] = 1;
         }
     }
 }
 
 void movePlayer(int rot) {
-    struct vec2 rVec = rotVec(yRot);
+    struct vec2 rVec = rotVec(degToRad(rot));
     struct vec2 nPos = pos;
     nPos.x += round(rVec.x);
     nPos.y += round(rVec.y);
@@ -146,7 +197,6 @@ int buffer[WIDTH*HEIGHT] = {0};
 int last[WIDTH*HEIGHT];
 
 bool menuopen = FALSE;
-bool quit = FALSE;
 
 int main() {
     srand(time(NULL));
@@ -178,7 +228,12 @@ int main() {
         }
     }
 
-    while (!quit) {
+    while (!options[nitems(options)-1]) {
+        if (curfont != options[1]) {
+            loadfont();
+            curfont = options[1];
+        }
+
         key = getch();
 
         if (key == 'w') {
@@ -194,7 +249,7 @@ int main() {
         if (key == 'e')
             yRot = (yRot + 5) % 360;
         if (key == 'q')
-            yRot = (yRot - 5) % -360;
+            yRot = (yRot + 355) % 360;
         
         if (key == '`') {
             menuopen = !menuopen;
@@ -209,6 +264,19 @@ int main() {
             blitrect(buffer, 8, 8, WIDTH-8, HEIGHT-8, WIDTH, 0);
             blitrect(buffer, 9, 9, WIDTH-9, HEIGHT-9, WIDTH, 1);
             blitrect(buffer, 10, 10, WIDTH-10, HEIGHT-10, WIDTH, 0);
+
+            blitstr(buffer, 12, 12, WIDTH, "menu", 4);
+
+            for (int i = 0; i < nitems(options); i++) {
+                blitstr(buffer, 12, 20+i*6, WIDTH, mnames[i], nitems(mnames[i]));
+
+                char ch[1] = { options[i]+97 };
+                blitstr(buffer, 18+nitems(mnames[i])*6, 20+i*6, WIDTH, ch, 1);
+
+                if (key == i+'0') {
+                    options[i] = (options[i] + 1) % (opmax[i]+1);
+                }
+            }
         }
 
         if (memcmp(buffer, last, bsize) != 0) {
