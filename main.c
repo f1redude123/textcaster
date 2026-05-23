@@ -76,7 +76,7 @@ void fillTile(int x, int y) {
     float num = rand() / (double)RAND_MAX;
     for (int i = 0; i < GRID_RES; i++) {
         for (int n = 0; n < GRID_RES; n++) {
-            map[idx(x*GRID_RES + i, y*GRID_RES + n, SIZE*GRID_RES)] = (int)(num > 0.7 || x == 0 || x == SIZE-1 || y == 0 || y == SIZE-1);
+            map[idx(x*GRID_RES + i, y*GRID_RES + n, SIZE*GRID_RES)] = (int)(/*num > 0.7 ||*/ x == 0 || x == SIZE-1 || y == 0 || y == SIZE-1);
         }
     }
 }
@@ -136,12 +136,12 @@ int FONT[36*36];
 int curfont = -1;
 
 void loadfont() {
-    char ch = (options[1]+'0');
-    //char *fp = strcat(".txt", &ch);
+    char fp[] = { (options[1]+(char)'0'), '.', 't', 'x', 't' };
     FILE *font = fopen("0.txt", "r");
 
-    char stream[1296];
-    fread(stream, sizeof(char), 1296, font);
+    char stream[8028];
+    fread(stream, sizeof(char), 8028, font);
+    fclose(font);
 
     int chi = 0;
     for (int i = 0; i < 1296; i++) {
@@ -156,7 +156,7 @@ void blitstr(int buf[], int x, int y, int xBound, char str[], size_t len) {
     for (int i = 0; i < len; i++) {
         for (int l = 0; l < 6; l++) {
             for (int r = 0; r < 6; r++) {
-                buf[idx(x+i*6+r, y+l, xBound)] = FONT[((int)(str[i])-87)*36 + l*6 + r];
+                buf[idx(x+i*6+r, y+l, xBound)] = FONT[((int)(str[i])-32)*36 + l*6 + r];
             }
         }
     }
@@ -177,7 +177,7 @@ void raycast(int proj[]) {
             rayPos.x += dir.x;
             rayPos.y += dir.y;
         }
-        int dist = (int)sqrt(pow(rayPos.x-pos.x, 2) + pow(rayPos.y-pos.y, 2));
+        int dist = (int)(sqrt(pow(rayPos.x-pos.x, 2) + pow(rayPos.y-pos.y, 2)));
         for (int i = min(HEIGHT, dist); i < max(0, HEIGHT-dist); i++) {
             proj[idx(rot+WIDTH/2, i, WIDTH)] = 1;
         }
@@ -229,6 +229,9 @@ int main() {
     }
 
     while (!options[nitems(options)-1]) {
+        char fp[] = { (options[1]+(char)'0'), '.', 't', 'x', 't' };
+        printw("%s", fp);
+
         if (curfont != options[1]) {
             loadfont();
             curfont = options[1];
@@ -265,9 +268,11 @@ int main() {
             blitrect(buffer, 9, 9, WIDTH-9, HEIGHT-9, WIDTH, 1);
             blitrect(buffer, 10, 10, WIDTH-10, HEIGHT-10, WIDTH, 0);
 
-            blitstr(buffer, 12, 12, WIDTH, "menu", 4);
+            blitstr(buffer, 12, 12, WIDTH, "0123456789", 10);
+            blitstr(buffer, 12, 18, WIDTH, ":;<=>?@A", 8);
+            blitstr(buffer, 12, 24, WIDTH, "ABCDEFG", 7);
 
-            for (int i = 0; i < nitems(options); i++) {
+            /*for (int i = 0; i < nitems(options); i++) {
                 blitstr(buffer, 12, 20+i*6, WIDTH, mnames[i], nitems(mnames[i]));
 
                 char ch[1] = { options[i]+97 };
@@ -276,7 +281,7 @@ int main() {
                 if (key == i+'0') {
                     options[i] = (options[i] + 1) % (opmax[i]+1);
                 }
-            }
+            }*/
         }
 
         if (memcmp(buffer, last, bsize) != 0) {
