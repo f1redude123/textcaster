@@ -1,4 +1,5 @@
 #define _XOPEN_SOURCE_EXTENDED 1
+#include <stdio.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -32,9 +33,9 @@ int opmax[] = {
 };
 
 char mnames[][8] = {
-    "renderer",
-    "font",
-    "quit"
+    "Renderer",
+    "Font",
+    "Quit"
 };
 
 int map[SIZE*GRID_RES*SIZE*GRID_RES] = {0};
@@ -132,19 +133,24 @@ void blitrect(int buf[], int minx, int miny, int maxx, int maxy, int xBound, int
     }
 }
 
-int FONT[36*36];
+int FONT[8028];
 int curfont = -1;
 
 void loadfont() {
     char fp[] = { (options[1]+(char)'0'), '.', 't', 'x', 't' };
     FILE *font = fopen("0.txt", "r");
 
-    char stream[8028];
-    fread(stream, sizeof(char), 8028, font);
+    fseek(font, 0l, SEEK_END);
+    int len = ftell(font)/sizeof(char);
+
+    rewind(font);
+
+    char stream[len];
+    fread(stream, sizeof(char), len, font);
     fclose(font);
 
     int chi = 0;
-    for (int i = 0; i < 1296; i++) {
+    for (int i = 0; i < len; i++) {
         if (stream[i] == '0' || stream[i] == '1') {
             FONT[chi] = stream[i] - '0';
             chi++;
@@ -229,9 +235,6 @@ int main() {
     }
 
     while (!options[nitems(options)-1]) {
-        char fp[] = { (options[1]+(char)'0'), '.', 't', 'x', 't' };
-        printw("%s", fp);
-
         if (curfont != options[1]) {
             loadfont();
             curfont = options[1];
@@ -268,11 +271,9 @@ int main() {
             blitrect(buffer, 9, 9, WIDTH-9, HEIGHT-9, WIDTH, 1);
             blitrect(buffer, 10, 10, WIDTH-10, HEIGHT-10, WIDTH, 0);
 
-            blitstr(buffer, 12, 12, WIDTH, "0123456789", 10);
-            blitstr(buffer, 12, 18, WIDTH, ":;<=>?@A", 8);
-            blitstr(buffer, 12, 24, WIDTH, "ABCDEFG", 7);
+            blitstr(buffer, 12, 12, WIDTH, "Menu", 4);
 
-            /*for (int i = 0; i < nitems(options); i++) {
+            for (int i = 0; i < nitems(options); i++) {
                 blitstr(buffer, 12, 20+i*6, WIDTH, mnames[i], nitems(mnames[i]));
 
                 char ch[1] = { options[i]+97 };
@@ -281,7 +282,7 @@ int main() {
                 if (key == i+'0') {
                     options[i] = (options[i] + 1) % (opmax[i]+1);
                 }
-            }*/
+            }
         }
 
         if (memcmp(buffer, last, bsize) != 0) {
