@@ -138,7 +138,7 @@ int curfont = -1;
 
 void loadfont() {
     char fp[] = { (options[1]+(char)'0'), '.', 't', 'x', 't' };
-    FILE *font = fopen("0.txt", "r");
+    FILE *font = fopen(fp, "r");
 
     fseek(font, 0l, SEEK_END);
     int len = ftell(font)/sizeof(char);
@@ -276,8 +276,8 @@ int main() {
             for (int i = 0; i < nitems(options); i++) {
                 blitstr(buffer, 12, 20+i*6, WIDTH, mnames[i], nitems(mnames[i]));
 
-                char ch[1] = { options[i]+97 };
-                blitstr(buffer, 18+nitems(mnames[i])*6, 20+i*6, WIDTH, ch, 1);
+                char name[1] = { options[i]+'0' };
+                blitstr(buffer, 18+nitems(mnames[i])*6, 20+i*6, WIDTH, name, 1);
 
                 if (key == i+'0') {
                     options[i] = (options[i] + 1) % (opmax[i]+1);
