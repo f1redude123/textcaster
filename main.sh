@@ -1,2 +1,2 @@
-gcc main.c -lncursesw -o main -lm
-./main
+gcc main.c -lncursesw -o textcaster -lm
+./textcaster

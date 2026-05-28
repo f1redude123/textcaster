@@ -1,7 +1,6 @@
 #define _XOPEN_SOURCE_EXTENDED 1
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <math.h>
 #include <time.h>
 #include <string.h>
@@ -14,20 +13,22 @@ struct vec2 {
     float y;
 };
 
-#define SIZE 10
-#define GRID_RES 4
+#define SIZE 20
+#define GRID_RES 8
 
 #define WIDTH 90
-#define HEIGHT 50
+#define HEIGHT 60
 
 int options[] = {
     0,
     0,
+    1,
     0
 };
 
 int opmax[] = {
     2,
+    1,
     1,
     1
 };
@@ -35,6 +36,7 @@ int opmax[] = {
 char mnames[][8] = {
     "Renderer",
     "Font",
+    "Map Size",
     "Quit"
 };
 
@@ -52,7 +54,7 @@ struct vec2 rotVec(float rot) {
 }
 
 float degToRad(float deg) {
-    return deg * PI / 180;
+    return deg * PI / 180.0f;
 }
 
 int idx(int x, int y, int xBound) {
@@ -77,7 +79,7 @@ void fillTile(int x, int y) {
     float num = rand() / (double)RAND_MAX;
     for (int i = 0; i < GRID_RES; i++) {
         for (int n = 0; n < GRID_RES; n++) {
-            map[idx(x*GRID_RES + i, y*GRID_RES + n, SIZE*GRID_RES)] = (int)(/*num > 0.7 ||*/ x == 0 || x == SIZE-1 || y == 0 || y == SIZE-1);
+            map[idx(x*GRID_RES + i, y*GRID_RES + n, SIZE*GRID_RES)] = (int)(num > 0.8 || x == 0 || x == SIZE-1 || y == 0 || y == SIZE-1);
         }
     }
 }
@@ -168,6 +170,14 @@ void blitstr(int buf[], int x, int y, int xBound, char str[], size_t len) {
     }
 }
 
+void blitbuf(int src[], int dest[], int x, int y, int xBoundSrc, int xBoundDest, size_t srclen, int skip) {
+    for (int j = 0; j < xBoundSrc/skip; j++) {
+        for (int k = 0; k < (int)(srclen/xBoundSrc)/skip; k++) {
+            dest[idx(x+j, y+k, xBoundDest)] = src[idx(j*skip, k*skip, xBoundSrc)];
+        }
+    }
+}
+
 #pragma endregion
 
 #pragma region MAIN LOOP
@@ -176,6 +186,7 @@ struct vec2 pos;
 int yRot = 0;
 
 void raycast(int proj[]) {
+    struct vec2 facvec = rotVec(degToRad(yRot));
     for (int rot = -WIDTH / 2; rot < WIDTH / 2; rot++) {
         struct vec2 rayPos = pos;
         struct vec2 dir = rotVec(degToRad((rot+yRot)%360));
@@ -183,8 +194,9 @@ void raycast(int proj[]) {
             rayPos.x += dir.x;
             rayPos.y += dir.y;
         }
-        int dist = (int)(sqrt(pow(rayPos.x-pos.x, 2) + pow(rayPos.y-pos.y, 2)));
-        for (int i = min(HEIGHT, dist); i < max(0, HEIGHT-dist); i++) {
+        float diff = atan2(dir.x, dir.y) - atan2(facvec.x, facvec.y);
+        int dist = (int)(sqrt(pow(rayPos.x-pos.x, 2) + pow(rayPos.y-pos.y, 2)) * cos(diff));
+        for (int i = min(HEIGHT, dist); i <= max(0, HEIGHT-dist); i++) {
             proj[idx(rot+WIDTH/2, i, WIDTH)] = 1;
         }
     }
@@ -265,6 +277,12 @@ int main() {
 
         memset(buffer, 0, bsize);
         raycast(buffer);
+
+        int s = GRID_RES / (options[2]+1);
+
+        blitrect(buffer, 1, 1, SIZE*GRID_RES/s+3, SIZE*GRID_RES/s+3, WIDTH, 0);
+        blitbuf(map, buffer, 2, 2, SIZE*GRID_RES, WIDTH, nitems(map), s);
+        blitrect(buffer, (int)(pos.x/s)+2, (int)(pos.y/s)+2, (int)(pos.x/s)+3, (int)(pos.y/s)+3, WIDTH, 1);
 
         if (menuopen) {
             blitrect(buffer, 8, 8, WIDTH-8, HEIGHT-8, WIDTH, 0);
