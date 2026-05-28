@@ -6,6 +6,8 @@ WASD to move, EQ to rotate camera
 To enter menu, press backtick (`)  
 To change menu options, press number key of index of menu option(starting at 0) to cycle through  
 
+The spaces in the font file are also kinda broken rn, if u wanna fix that and know how go ahead  
+
 If you know anything about C, you can change some of the predefined vars in the code for higher res/different output dimensions.
 
 Have fun :3
